@@ -33,9 +33,9 @@ def main():
     # initialize the app
     app = Application(sys.argv)
 
-    app.setOrganizationName("TruFont")
+    app.setOrganizationName("Counterpunch")
     app.setOrganizationDomain("trufont.github.io")
-    app.setApplicationName("TruFont")
+    app.setApplicationName("Counterpunch")
     app.setApplicationVersion(__version__)
 
     app.setWindowIcon(QIcon(":app.png"))

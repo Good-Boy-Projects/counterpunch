@@ -142,7 +142,7 @@ def setAppName():
             if bundle:
                 app_info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
                 if app_info:
-                    app_info["CFBundleName"] = "TruFont"
+                    app_info["CFBundleName"] = "Counterpunch"
         except ImportError as e:
             print(f"Could not set title: {e}")
             pass

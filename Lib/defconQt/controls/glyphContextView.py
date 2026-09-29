@@ -333,26 +333,31 @@ class GlyphContextView(QWidget):
         Zooms the view by *step* increments (with a scale factor of
         1.2^*step*), anchored to *anchor*:
 
-        - QPoint_: center on that point
+        - QPoint_/QPointF_: center on that point
         - "cursor": center on the mouse cursor position
         - "center": center on the viewport
-        - None: don’t anchor, i.e. stick to the viewport’s top-left.
+        - None: don't anchor, i.e. stick to the viewport's top-left.
 
         # TODO: improve docs from QGraphicsView descriptions.
 
         The default is "center".
 
-        .. _QPoint: http://doc.qt.io/qt-5/qpoint.html
+        .. _QPoint: http://doc.qt.io/qt-6/qpoint.html
+        .. _QPointF: http://doc.qt.io/qt-6/qpointf.html
         """
         oldScale = self._scale
         if newScale < 1e-2 or newScale > 1e3:
             return
         # compute new position
         # http://stackoverflow.com/a/32269574/2037879
-        if isinstance(anchor, QPoint):
-            pos = anchor
+        # NOTE: pos is always normalized to QPointF here — self._drawingOffset
+        # is a QPointF, and mixing QPoint/QPointF in arithmetic below has no
+        # valid overload in PySide6/Qt6 (unlike PyQt5/Qt5, which silently
+        # coerced). Keeping pos as QPointF end to end avoids that.
+        if isinstance(anchor, (QPoint, QPointF)):
+            pos = QPointF(anchor)
         elif anchor == "cursor":
-            pos = self.mapFromGlobal(QCursor.pos())
+            pos = QPointF(self.mapFromGlobal(QCursor.pos()))
         elif anchor == "center":
             pos = QPointF(0.5 * self.width(), 0.5 * self.height())
         else:
@@ -361,7 +366,7 @@ class GlyphContextView(QWidget):
         delta = deltaToPos * (newScale - oldScale)
         self.setScale(newScale)
         self._drawingOffset -= delta
-
+        
     # position mapping
 
     def mapFromCanvas(self, pos, index=None):
