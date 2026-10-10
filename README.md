@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="packaging/trufont-logo-1024.png" alt="Counterpunch icon" width="128">
+
 # Counterpunch
 
 **A UFO-native font editor for macOS and Linux**
