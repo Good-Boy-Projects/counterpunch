@@ -145,9 +145,9 @@ def SplitLinesQPainterPathFactory(glyph):
 class SplitLinesFromPathQtPen(QtPen):
     def __init__(self, glyphSet, path=None):
         # Explicit path= so fontTools.pens.qtPen.QtPen doesn't fall back to
-        # its own internal `from PyQt5.QtGui import QPainterPath` when this
-        # class is constructed with no path (as SplitLinesQPainterPathFactory
-        # does above). Same fix as elsewhere in this port.
+        # its own internal Qt5-binding QPainterPath import when this class is
+        # constructed with no path (as SplitLinesQPainterPathFactory does
+        # above). Same fix as elsewhere in this port.
         if path is None:
             path = QPainterPath()
         super().__init__(glyphSet, path)

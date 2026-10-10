@@ -247,7 +247,7 @@ def value(key, fallback=None, type=None):
             type = _type(fallback)
     # PySide6's QSettings.value() only accepts a narrow set of types
     # ('list', 'bytes', 'str', 'int', 'float', 'bool', or a Qt-derived
-    # type) for its `type` parameter, unlike PyQt5. dict round-trips fine
+    # type) for its `type` parameter, unlike the old Qt5 binding. dict round-trips fine
     # through QSettings on its own, so omit the type argument for it.
     if type is dict:
         return settings.value(key, fallback)

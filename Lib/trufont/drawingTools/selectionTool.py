@@ -512,14 +512,18 @@ class SelectionTool(BaseTool):
     def mouseDoubleClickEvent(self, event):
         widget = self.parent()
         self._mouseItem = item = widget.itemAt(self._origin)
-        self._glyph.beginUndoGroup()
+        # grab the glyph up front: self._glyph resolves dynamically to the
+        # active glyph, which may change below (see "switched")
+        glyph = self._glyph
+        glyph.beginUndoGroup()
+        switched = False
         if item is not None:
             if isinstance(item, tuple):
                 contour, index = item
                 point = contour[index]
-                if point.segmentType is not None:
-                    if all(contour.getPoint(index + d).segmentType for d in (-1, 1)):
-                        return
+                if point.segmentType is not None and not all(
+                    contour.getPoint(index + d).segmentType for d in (-1, 1)
+                ):
                     point.smooth = not point.smooth
                     contour.dirty = True
                     # if we have one offCurve, make it tangent
@@ -527,14 +531,16 @@ class SelectionTool(BaseTool):
             elif isinstance(item, (Anchor, Guideline)):
                 self._editItem(item)
         else:
-            if self._performSegmentClick(event.localPos(), "selectContour"):
-                return
-            index = widget.indexForPoint(widget.mapFromCanvas(event.localPos()))
-            if index is not None:
-                # we're about to switch glyph, end undo group first
-                self._glyph.endUndoGroup()
-                self._switched = True
-                widget.setActiveIndex(index)
+            if not self._performSegmentClick(event.localPos(), "selectContour"):
+                index = widget.indexForPoint(widget.mapFromCanvas(event.localPos()))
+                if index is not None:
+                    switched = True
+        # always close the undo group we opened, on every exit path, before
+        # possibly switching glyphs
+        glyph.endUndoGroup()
+        if switched:
+            self._switched = True
+            widget.setActiveIndex(index)
         # don't perform move events on double click
         self._origin = None
 

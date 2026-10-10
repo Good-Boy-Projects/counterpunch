@@ -252,7 +252,7 @@ class MetricsToolBar(QToolBar):
         self.comboBox.setValidator(QIntValidator(self))
         for p in pointSizes:
             self.comboBox.addItem(str(p))
-        self.pointSizeChanged = self.comboBox.currentIndexChanged[str]
+        self.pointSizeChanged = self.comboBox.currentTextChanged
 
         self.configBar = QPushButton(self)
         self.configBar.setFlat(True)

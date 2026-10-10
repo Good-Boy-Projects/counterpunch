@@ -23,10 +23,10 @@ from PySide6.QtGui import QPainterPath
 
 def QPainterPathFactory(glyph):
     # Pass path= explicitly so fontTools.pens.qtPen.QtPen does not fall back
-    # to its own internal `from PyQt5.QtGui import QPainterPath` — that
-    # fallback only triggers when path is left as None, and mixing PyQt5's
-    # QPainterPath into a PySide6 app is exactly what caused the objc
-    # framework collision / QPixmap crash during the port.
+    # to its own internal Qt5-binding QPainterPath import — that fallback
+    # only triggers when path is left as None, and mixing the old Qt5
+    # binding's QPainterPath into a PySide6 app is exactly what caused the
+    # objc framework collision / QPixmap crash during the port.
     pen = QtPen(glyph.layer, path=QPainterPath())
     glyph.draw(pen)
     pen.path.setFillRule(Qt.FillRule.WindingFill)

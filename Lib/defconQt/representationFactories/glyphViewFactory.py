@@ -36,7 +36,8 @@ def NoComponentsQPainterPathFactory(glyph):
 class NoComponentsQtPen(QtPen):
     def __init__(self, glyphSet, path=None):
         # See qPainterPathFactory.py for why path is constructed explicitly:
-        # QtPen falls back to PyQt5's QPainterPath internally if path is None.
+        # QtPen falls back to the old Qt5 binding's QPainterPath internally
+        # if path is None.
         if path is None:
             path = QPainterPath()
         super().__init__(glyphSet, path=path)

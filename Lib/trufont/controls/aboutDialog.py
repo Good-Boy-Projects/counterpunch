@@ -75,14 +75,14 @@ class AboutDialog(QDialog):
         titleLabel.setText(
             self.tr(
                 "<p style='color: #353535; font-size: 24pt; font-weight: 250'>"
-                "TruFont Font Editor</p>"
-                "<p style='font-size: 13pt; font-weight: 400'>{} Pristine Wax</p>"
+                "Counterpunch Font Editor</p>"
+                "<p style='font-size: 13pt; font-weight: 400'> Pristine Wax</p>"
             ).format(__version__)
         )
         textLabel = QLabel(self)
         # "PyQt {}" -> "PySide6 {}" since the binding actually running has
-        # changed; QT_VERSION_STR / PYSIDE_VERSION_STR replace the old
-        # PyQt5.Qt-umbrella QT_VERSION_STR / PYQT_VERSION_STR constants,
+        # changed; QT_VERSION_STR / PYSIDE_VERSION_STR replace the old Qt5
+        # binding's Qt-umbrella QT_VERSION_STR / PYQT_VERSION_STR constants,
         # which have no PySide6 equivalent under that name.
         text = self.tr(
             "<p>{n} is a free and open source font editor and scripting "

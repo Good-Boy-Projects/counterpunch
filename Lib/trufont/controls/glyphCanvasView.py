@@ -401,6 +401,13 @@ class GlyphCanvasView(GlyphContextView):
         app.postNotification("glyphViewContextMenu", data)
 
     def keyPressEvent(self, event):
+        # Hold ` (backtick/tilde key, unshifted) to preview the filled
+        # glyph, RoboFont-style. Handled here, before tool redirection, so
+        # it works regardless of which drawing tool is currently active.
+        if not event.isAutoRepeat() and event.key() == Qt.Key.Key_QuoteLeft:
+            self.setPreviewEnabled(True)
+            event.accept()
+            return
         # TODO: put this in event filter?
         if self._currentTool.grabKeyboard and event.key() == Qt.Key.Key_Escape:
             ok = self.setCurrentTool(self._previousTool)
@@ -416,6 +423,10 @@ class GlyphCanvasView(GlyphContextView):
         app.postNotification("glyphViewKeyPress", data)
 
     def keyReleaseEvent(self, event):
+        if not event.isAutoRepeat() and event.key() == Qt.Key.Key_QuoteLeft:
+            self.setPreviewEnabled(False)
+            event.accept()
+            return
         # TODO: I don't know why we have to do this for releaseEvent
         if not self._currentTool.grabKeyboard and event.key() == Qt.Key.Key_Space:
             event.ignore()

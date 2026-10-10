@@ -106,3 +106,9 @@ ENV/
 
 # JetBrains
 .idea/
+.DS_Store
+builds/
+dist/
+build/
+.DS_Store
+!packaging/*.spec

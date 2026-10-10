@@ -289,10 +289,10 @@ class TGlyph(Glyph):
         )
 
     def beginUndoGroup(self, text=None):
-        self._undoManager.beginUndoGroup(text)
+        self.undoManager.beginUndoGroup(text)
 
     def endUndoGroup(self):
-        self._undoManager.endUndoGroup()
+        self.undoManager.endUndoGroup()
 
     # observe anchor selection
 

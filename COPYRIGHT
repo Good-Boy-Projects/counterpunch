@@ -1,10 +1,15 @@
-The TruFont Project is Copyright 2015–2017, The TruFont Project Developers.
+Counterpunch is Copyright 2026, Good Boy Projects.
+
+Counterpunch is a fork of the TruFont Project, which is
+Copyright 2015–2017, The TruFont Project Developers. The original
+copyright notices and license terms are retained. Counterpunch contains
+modifications to the original TruFont source code, made from 2026 onward.
 
 Licensed under the GNU General Public License version 3 (see
 LICENSE.GPLv3) or the GNU Lesser General Public License version 3
 (see LICENSE.LGPLv3), at your option.
 
-Note that the TruFont Project uses PyQt5 as a library, which free
-version is provided under the GNU GPL v3 license. The copyleft clause may
-apply, in which case the end-user is left with choosing the GNU GPL v3
-as the end-user license.
+Note that Counterpunch uses Qt for Python (PySide6) as a library, which is
+provided by The Qt Company under the GNU LGPL v3 and GNU GPL v3 licenses.
+Earlier versions of TruFont used PyQt5, whose free version is GPL v3 only;
+Counterpunch no longer depends on it.

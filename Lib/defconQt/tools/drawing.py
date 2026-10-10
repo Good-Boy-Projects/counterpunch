@@ -135,7 +135,7 @@ def rectanglePath(x, y, size):
 def trianglePath(x, y, size, angle):
     thirdSize = size / 3
     # Explicit path= so fontTools.pens.qtPen.QtPen doesn't fall back to its
-    # internal `from PyQt5.QtGui import QPainterPath` (see qPainterPathFactory
+    # internal Qt5-binding QPainterPath import (see qPainterPathFactory
     # and glyphViewFactory ports for the same fix).
     pen = QtPen({}, path=QPainterPath())
     tPen = TransformPen(pen, Identity.rotate(angle))
