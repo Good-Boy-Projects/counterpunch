@@ -248,6 +248,8 @@ def removeUIGlyphElements(glyph, preserveShape):
             parent.removeGuideline(guideline)
     if glyph.image.selected:
         glyph.image = None
+        # drop the cached pixmap so the canvas stops drawing the old image
+        glyph.image.destroyAllRepresentations()
     glyph.endUndoGroup()
 
 

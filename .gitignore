@@ -111,3 +111,4 @@ builds/
 dist/
 build/
 .DS_Store
+!packaging/*.spec

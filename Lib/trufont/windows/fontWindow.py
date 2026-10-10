@@ -40,6 +40,25 @@ from trufont.windows.groupsWindow import GroupsWindow
 from trufont.windows.kerningWindow import KerningWindow
 from trufont.windows.metricsWindow import MetricsWindow
 
+IMAGE_MIME = "application/x-counterpunch-image-data"
+
+
+def _selectedImage(glyph):
+    """Return glyph.image if it should be copied: it exists, is selected, and no
+    points, anchors or components are selected (so contour copy keeps priority)."""
+    image = glyph.image
+    if image is None or not image.fileName or not image.selected:
+        return None
+    for contour in glyph:
+        if any(p.selected for p in contour):
+            return None
+    if any(a.selected for a in glyph.anchors):
+        return None
+    if any(c.selected for c in glyph.components):
+        return None
+    return image
+
+
 _path = QPainterPath()
 _path.moveTo(5, 8)
 _path.lineTo(23, 8)
@@ -690,7 +709,15 @@ class FontWindow(BaseWindow):
         widget = self.stackWidget.currentWidget()
         if self.isGlyphTab():
             glyph = widget.activeGlyph()
-            deleteUISelection(glyph)
+            image = _selectedImage(glyph)
+            if image is not None:
+                glyph.beginUndoGroup()
+                glyph.image = None
+                # drop the cached pixmap so the canvas stops drawing the old image
+                glyph.image.destroyAllRepresentations()
+                glyph.endUndoGroup()
+            else:
+                deleteUISelection(glyph)
         else:
             glyphs = widget.glyphs()
             for index in widget.selection():
@@ -729,6 +756,22 @@ class FontWindow(BaseWindow):
             svgGlyphs.append(g)
 
         mimeData.setData("application/x-trufont-glyph-data", pickle.dumps(pickled))
+
+        if self.isGlyphTab():
+            image = _selectedImage(widget.activeGlyph())
+            if image is not None:
+                data = font.images[image.fileName]
+                mimeData.setData(
+                    IMAGE_MIME,
+                    pickle.dumps(
+                        {
+                            "fileName": image.fileName,
+                            "data": bytes(data),
+                            "transformation": tuple(image.transformation),
+                            "color": image.color,
+                        }
+                    ),
+                )
 
         svg = """\
 <?xml version="1.0" standalone="no"?>
@@ -772,6 +815,27 @@ class FontWindow(BaseWindow):
             glyphs = widget.glyphsForIndexes(selection)
         clipboard = QApplication.clipboard()
         mimeData = clipboard.mimeData()
+        if isGlyphTab and mimeData.hasFormat(IMAGE_MIME):
+            payload = pickle.loads(bytes(mimeData.data(IMAGE_MIME)))
+            glyph = widget.activeGlyph()
+            images = self._font.images
+            fileName, data = payload["fileName"], payload["data"]
+            # avoid clobbering a different image that has the same name
+            base, ext = os.path.splitext(fileName)
+            n = 1
+            while fileName in images and bytes(images[fileName]) != data:
+                fileName = "%s_%d%s" % (base, n, ext)
+                n += 1
+            glyph.beginUndoGroup()
+            if fileName not in images:
+                images[fileName] = data
+            image = glyph.instantiateImage()
+            image.fileName = fileName
+            image.transformation = payload["transformation"]
+            image.color = payload["color"]
+            glyph.image = image
+            glyph.endUndoGroup()
+            return
         if mimeData.hasFormat("application/x-trufont-glyph-data"):
             data = pickle.loads(mimeData.data("application/x-trufont-glyph-data"))
             if len(data) == len(glyphs):
