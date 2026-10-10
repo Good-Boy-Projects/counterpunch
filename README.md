@@ -1,120 +1,70 @@
 <div align="center">
 
-# TruFont
+# Counterpunch
 
-**Multi-platform UFO font editor**
-
-[![Build status](https://travis-ci.org/trufont/trufont.svg?branch=master)](https://travis-ci.org/trufont/trufont)
+**A UFO-native font editor for macOS and Linux**
 
 </div>
 
-**Maintenance status:** The trufont project is currently discontinued.
-Although we will happily accept bug fixes, no new features are currently
-planned.
+Counterpunch is a modern font editor built with Python 3 and PySide6 (Qt 6). It is a
+fork of [TruFont](https://trufont.github.io), ported from PyQt5 to PySide6 and
+developed independently. It works directly on UFO sources. It is built for
+macOS, with Linux support planned.
 
-[TruFont](https://trufont.github.io) is a multiplatform font editor
-built with Python3 and PyQt5.
-
-The `wx` branch contains a stub wxWidgets port of the app.
+**Status:** early development (0.x). Expect rough edges - I'm working on it!.
 
 ## Getting started
 
-1.  Install **Python 3.6** (or later):
+Counterpunch is currently run from source. Only macOS is supported at the
+moment; Linux is planned.
 
-    -   OS X: Install using [Homebrew](http://brew.sh/):
-        `brew install python3`
-    -   Windows: Download installer from
-        [python.org/downloads](https://www.python.org/downloads/)
-    -   Linux: It's usually packaged with the OS.
+1.  Install [uv](https://docs.astral.sh/uv/) (`brew install uv`) and
+    Python 3.12.
 
-2.  Set up a new Python **virtual environment**. Although this is not
-    required, it's *highly recommended*, since TruFont has lots of
-    dependencies, which may (or may not) conflict with other modules you
-    installed globally.
+2.  Clone the repository and create a virtual environment:
 
-    -   To create a new virtual environment in `ENV_DIR`:
-
-        `python3 -m venv ENV_DIR`
-
-        This creates a new `ENV_DIR` folder (you can choose the name you
-        want). The `bin` subfolder (or `Scripts` if you are on Windows)
-        contains a new `python` executable, and the `pip` installer
-        linked to that.
-
-    -   Activate the newly created environment:
-
-        -   OS X or Linux: `source ENV_DIR/bin/activate`
-        -   Windows: `ENV_DIR\Scripts\activate.bat`
-
-        This temporarily adds the virtual environment's scripts folder
-        to your console's `PATH`, so you can access `python`, `pip` and
-        the `trufont` script from anywhere.
-
-    -   Run `deactivate` when you wish to exit the virtual environment.
-        This restores the default system `PATH`.
-
-3.  Install/update TruFont to the latest stable release:
-
-    `pip install --upgrade trufont`
-
-4.  Run the app as `trufont`.
-
-## Contributing
-
-Here's a quick tutorial if you'd like to contribute to TruFont.
-
-1.  Click the "Fork" button above, and clone the forked git repository
-    to a new directory called `trufont`:
-
-    `git clone https://github.com/<YOUR_USERNAME>/trufont`
-
-2.  Move into the new folder and run this command to add the upstream
-    repository url to the local list of remotes:
-
-    `git remote add upstream https://github.com/trufont/trufont`
-
-    This enables you to keep up-to-date with the upstream development.
-
-3.  Synchronize your fork's `master` branch
-    with the `upstream/master`, especially before creating new branches:
-
-    ``` 
-    git checkout master
-    git fetch upstream
-    git rebase upstream/master
-    git push
+    ```
+    git clone git@github.com:Good-Boy-Projects/counterpunch.git
+    cd counterpunch
+    uv venv --python 3.12
+    source .venv/bin/activate
     ```
 
-4.  Install pre-commit. It will run some checks every time you are about
-    to commit something.
+3.  Install in editable mode:
 
-    ``` 
-    pip install pre-commit
-    pre-commit install
+    ```
+    uv pip install -e ".[dev]"
     ```
 
-5.  Now, you can create and checkout your new feature branch:
+4.  Run the app:
 
-    `git checkout -b my-cool-new-feature`
+    ```
+    python -m trufont
+    ```
 
-6.  Use pip to install TruFont in "editable" mode:
+The Python package is still named `trufont` internally.
 
-    `pip install --editable .`
+## Building the macOS app
 
-    Instead of copying `trufont` to your
-    Python site-packages directory, this command only creates a link to
-    the source directory inside the git repository. You can then modify
-    the code in place, or synchronize the latest upstream changes (as in
-    step 4) without having to re-install.
+Install PyInstaller in the virtual environment, then run the packaging script:
 
-7.  It is also recommended to regularly update the dependencies to the
-    curently tested versions as listed in \`requirements.txt\`:
+```
+uv pip install pyinstaller
+./packaging/build-app.sh
+```
 
-    `pip install --upgrade -r requirements.txt`
+The app is written to `dist/Counterpunch.app`. Copy it to `/Applications` to
+launch it from the Dock. Builds are unsigned, so macOS may ask you to approve
+the first launch.
 
-8.  Once you have commited your patch, push the new branch to your fork:
+## Versioning
 
-    `git push -u origin my-cool-new-feature`
+Releases use semantic version tags with a `v` prefix, such as `v0.1.1`. The
+version is derived from the latest git tag, so a tag must be a valid Python
+version (no suffixes like `-beta`; use `rc1` or `b1` for pre-releases).
 
-9.  Finally, click "New pull request" on TruFont's GitHub page to submit
-    your patch.
+## License
+
+Counterpunch is licensed under the GNU GPL v3 or the GNU LGPL v3, at your
+option, as inherited from TruFont. See `COPYRIGHT`, `LICENSE.GPLv3` and
+`LICENSE.LGPLv3`. Credits are in `THANKS`.
