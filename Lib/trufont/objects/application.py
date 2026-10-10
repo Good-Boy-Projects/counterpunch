@@ -448,7 +448,15 @@ class Application(QApplication):
                 self.activeWindow(), title, directory, ";;".join(fileFormats)
             )
             if state:
-                dialog.restoreState(state)
+                try:
+                    dialog.restoreState(state)
+                except TypeError:
+                    # Defends against leftover corrupted state from the
+                    # directory/state bug (now fixed) that may still be
+                    # sitting in an old QSettings domain from earlier
+                    # testing. Safe to ignore — the dialog just opens
+                    # without restoring its previous size/position.
+                    pass
             # QFileDialog.AcceptOpen / ExistingFile moved under
             # QFileDialog.AcceptMode / FileMode in Qt6
             dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
@@ -457,11 +465,18 @@ class Application(QApplication):
             ret = dialog.exec()
             # save current directory
             # TODO: should open w/o file chooser also update current dir?
+            # BUGFIX: this previously saved `directory` (a plain str, only
+            # ever used to *initialize* the dialog) instead of `state` (the
+            # real QByteArray produced by dialog.saveState()). PyQt5 silently
+            # tolerated the type mismatch; PySide6 enforces the real C++
+            # signature and throws a TypeError the next time restoreState()
+            # is called with the corrupted str value. Save `state`, which is
+            # what restoreState() above actually expects to read back.
             state = dialog.saveState()
             if importKey:
-                settings.setImportFileDialogState(directory)
+                settings.setImportFileDialogState(state)
             else:
-                settings.setOpenFileDialogState(directory)
+                settings.setOpenFileDialogState(state)
             # cancelled?
             if not ret:
                 return
