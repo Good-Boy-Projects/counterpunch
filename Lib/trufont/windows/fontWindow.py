@@ -29,7 +29,7 @@ from trufont.controls.glyphDialogs import FindDialog
 from trufont.controls.propertiesView import PropertiesView
 from trufont.controls.statusBar import StatusBar
 from trufont.controls.tabWidget import TabWidget
-from trufont.controls.toolBar import ToolBar
+from trufont.controls.toolBar import ToolBar, metricsPlaceholderIcon
 from trufont.objects import settings
 from trufont.objects.menu import Entries
 from trufont.tools import errorReports, platformSpecific
@@ -138,6 +138,8 @@ class FontWindow(BaseWindow):
 
         self.toolBar = ToolBar(self)
         self.toolBar.setTools(t() for t in QApplication.instance().drawingTools())
+        self.toolBar.addActionButton(
+        self.tr("Metrics"), metricsPlaceholderIcon(), self.metrics, after="Text")
 
         self.glyphCellView = GlyphCellView(self)
         self.glyphCellView.glyphActivated.connect(self.openGlyphTab)
