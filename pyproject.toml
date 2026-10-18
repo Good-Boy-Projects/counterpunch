@@ -3,12 +3,12 @@ requires = ["setuptools>=68", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "trufont"
-description = "TruFont, a modular and cross-platform font editor."
+name = "counterpunch"
+description = "Counterpunch, a UFO-native font editor for macOS and Linux."
 readme = "README.rst"
 license = { text = "GNU LGPL v3/GNU GPL v3" }
 authors = [{ name = "Adrien Tétar", email = "adri-from-59@hotmail.fr" }]
-urls = { Homepage = "http://trufont.github.io" }
+urls = { Homepage = "https://github.com/Good-Boy-Projects/counterpunch" }
 requires-python = ">=3.11"          # was >=3.6 — bumping to match our target floor
 dynamic = ["version"]
 
@@ -49,7 +49,7 @@ dev = [
 ]
 
 [project.gui-scripts]
-trufont = "trufont.__main__:main"
+counterpunch = "counterpunch.__main__:main"
 
 [tool.setuptools]
 package-dir = { "" = "Lib" }

@@ -2,6 +2,6 @@
 defconQt is a set of Qt widgets for use in defcon applications.
 """
 
-import trufont
+import counterpunch
 
-__version__ = trufont.__version__
+__version__ = counterpunch.__version__

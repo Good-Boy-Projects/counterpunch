@@ -18,7 +18,7 @@ export TRUFONT_BUILD_VERSION="$VERSION"
 # Clean previous build artifacts so stale files don't leak into the new one
 rm -rf build dist
 
-pyinstaller packaging/trufont.spec
+pyinstaller packaging/counterpunch.spec
 
 mkdir -p builds
 cp -R "dist/Counterpunch.app" "builds/Counterpunch-$VERSION.app"
