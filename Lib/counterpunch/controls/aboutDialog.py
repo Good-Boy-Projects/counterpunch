@@ -1,0 +1,190 @@
+import os
+import platform
+import subprocess
+
+from PySide6 import __version__ as PYSIDE_VERSION_STR
+from PySide6.QtCore import QEvent, QSize, Qt
+from PySide6.QtCore import __version__ as QT_VERSION_STR
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QStackedWidget,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
+
+from counterpunch import __file__ as modulePath
+from counterpunch import __version__
+
+try:
+    PATH = os.path.abspath(os.path.join(modulePath, "../../.."))
+    gitShortHash = subprocess.check_output(
+        ["git", "rev-parse", "--short", "HEAD"], cwd=PATH, stderr=subprocess.DEVNULL
+    ).decode()
+    gitShortLog = subprocess.check_output(
+        ["git", "shortlog", "-sn"], cwd=PATH, stderr=subprocess.DEVNULL
+    ).decode()
+    with open(os.path.join(PATH, "COPYRIGHT"), encoding="utf-8") as fd:
+        licenseText = fd.read()
+    licenseText = "<p>{}</p>".format(
+        licenseText.replace("\n\n", "</p><p>").replace("\n", " ")
+    )
+    with open(os.path.join(PATH, "THANKS"), encoding="utf-8") as fd:
+        thanksText = fd.read()
+    thanksText = "<p>{}</p>".format(
+        thanksText.replace("\n\n", "</p><p>").replace("\n–", "<br>–").replace("\n", " ")
+    )
+except Exception:
+    gitShortHash = gitShortLog = licenseText = thanksText = ""
+
+
+class AboutDialog(QDialog):
+    def __init__(self, parent=None):
+        # Window flag constants moved under the scoped Qt.WindowType enum
+        # in Qt6 (were bare Qt.MSWindowsFixedSizeDialogHint etc. in Qt5).
+        super().__init__(
+            parent,
+            Qt.WindowType.MSWindowsFixedSizeDialogHint
+            | Qt.WindowType.WindowTitleHint
+            | Qt.WindowType.WindowSystemMenuHint
+            | Qt.WindowType.WindowCloseButtonHint,
+        )
+        # Qt.WA_DeleteOnClose moved under Qt.WidgetAttribute in Qt6
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        # Qt.ApplicationModal moved under Qt.WindowModality in Qt6
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.setWindowTitle(self.tr("About"))
+
+        app = QApplication.instance()
+        name = app.applicationName()
+        domain = app.organizationDomain()
+
+        iconLabel = QLabel(self)
+        iconLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        iconLabel.setMaximumWidth(250)
+        iconLabel.setMinimumSize(250, 210)
+        icon = self.windowIcon()
+        size = icon.actualSize(QSize(186, 186))
+        iconLabel.setPixmap(icon.pixmap(size))
+        titleLabel = QLabel(self)
+        titleLabel.setText(
+            self.tr(
+                "<p style='color: #353535; font-size: 24pt; font-weight: 250'>"
+                "Counterpunch Font Editor</p>"
+                "<p style='font-size: 13pt; font-weight: 400'> Pristine Wax</p>"
+            ).format(__version__)
+        )
+        textLabel = QLabel(self)
+        # "PyQt {}" -> "PySide6 {}" since the binding actually running has
+        # changed; QT_VERSION_STR / PYSIDE_VERSION_STR replace the old Qt5
+        # binding's Qt-umbrella QT_VERSION_STR / PYQT_VERSION_STR constants,
+        # which have no PySide6 equivalent under that name.
+        text = self.tr(
+            "<p>{n} is a free and open source font editor and scripting "
+            "environment made by the developers of the {n} community.</p>"
+            "<p>{n} is built upon the "
+            "<a href='http://ts-defcon.readthedocs.org/en/ufo3/' "
+            "style='color: #356FDE'>defcon</a> UFO library and exposes a "
+            "<a href='http://robofab.com/' style='color: #356FDE'>robofab</a>"
+            "-like API for scripting purposes.</p>"
+            "<p>Running on Qt {} (PySide6 {}).</p>"
+            "<p>Version {} {} – Python {}."
+        ).format(
+            QT_VERSION_STR,
+            PYSIDE_VERSION_STR,
+            __version__,
+            gitShortHash,
+            platform.python_version(),
+            n=name,
+        )
+        if domain:
+            text += self.tr(
+                "<br>See <a href='http://{d}' style='color: #356FDE'>{d}</a> "
+                "for more information.</p>"
+            ).format(d=domain)
+        else:
+            text += "</p>"
+        textLabel.setText(text)
+        textLabel.setOpenExternalLinks(True)
+        textLabel.setWordWrap(True)
+
+        authorsLabel = QTextBrowser(self)
+        authorsLabel.setText("\n".join(self.authors()))
+
+        licenseLabel = QTextBrowser(self)
+        licenseLabel.setText(licenseText)
+
+        thanksLabel = QTextBrowser(self)
+        thanksLabel.setText(thanksText)
+
+        self.stackWidget = QStackedWidget(self)
+        self.stackWidget.addWidget(textLabel)
+        self.stackWidget.addWidget(authorsLabel)
+        self.stackWidget.addWidget(licenseLabel)
+        self.stackWidget.addWidget(thanksLabel)
+
+        textLayout = QVBoxLayout()
+        textLayout.setContentsMargins(0, 14, 16, 16)
+        textLayout.addWidget(titleLabel)
+        textLayout.addWidget(self.stackWidget)
+        spacer = QWidget()
+        # QSizePolicy.Preferred / Expanding moved under QSizePolicy.Policy in Qt6
+        spacer.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
+        textLayout.addWidget(spacer)
+
+        mainLayout = QHBoxLayout()
+        mainLayout.addWidget(iconLabel)
+        mainLayout.addLayout(textLayout)
+
+        frame = QFrame()
+        frame.setMinimumHeight(54)
+        frame.setMaximumHeight(54)
+        frame.setStyleSheet("background: rgb(230, 230, 230)")
+
+        buttonsLayout = QHBoxLayout(frame)
+        for index, text in enumerate(("Authors", "License", "Credits")):
+            label = QLabel(text, self)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setCursor(Qt.CursorShape.PointingHandCursor)
+            label.setProperty("index", index + 1)
+            label.setStyleSheet("color: #356FDE; text-decoration: underline")
+            label.installEventFilter(self)
+            buttonsLayout.addWidget(label)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(mainLayout)
+        layout.addWidget(frame)
+
+    def authors(self):
+        for line in gitShortLog.splitlines():
+            elem = line.split("\t")[1]
+            if not elem or elem.startswith("=?") or elem.endswith("bot"):
+                continue
+            yield elem
+
+    # ----------
+    # Qt methods
+    # ----------
+
+    def eventFilter(self, obj, event):
+        # QEvent.MouseButtonPress moved under QEvent.Type in Qt6
+        if event.type() == QEvent.Type.MouseButtonPress:
+            index = obj.property("index")
+            if index is not None:
+                if self.stackWidget.currentIndex() == index:
+                    index = 0
+                self.stackWidget.setCurrentIndex(index)
+                return True
+            return False
+        return super().eventFilter(obj, event)
+
+    def sizeHint(self):
+        return QSize(600, 314)
