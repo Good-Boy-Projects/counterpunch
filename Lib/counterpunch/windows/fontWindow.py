@@ -139,7 +139,8 @@ class FontWindow(BaseWindow):
         self.toolBar = ToolBar(self)
         self.toolBar.setTools(t() for t in QApplication.instance().drawingTools())
         self.toolBar.addActionButton(
-        self.tr("Metrics"), metricsPlaceholderIcon(), self.metrics, after="Text")
+            self.tr("Metrics"), metricsPlaceholderIcon(), self.metrics, after="Text"
+        )
 
         self.glyphCellView = GlyphCellView(self)
         self.glyphCellView.glyphActivated.connect(self.openGlyphTab)
@@ -1154,12 +1155,25 @@ class FontWindow(BaseWindow):
         # disconnect eventual signal of previous glyph
         objects = ((self._undoAction, self.undo), (self._redoAction, self.redo))
         for action, slot in objects:
+            # PySide6: QAction.disconnect() with no arguments raises TypeError and
+            # disconnects nothing, so slots piled up and one Cmd+Z undid several steps.
             try:
-                action.disconnect()
-            except TypeError:
+                action.triggered.disconnect()
+            except (TypeError, RuntimeError):
                 pass
             action.triggered.connect(slot)
         # now update status
+        previous = getattr(self, "_connectedUndoManager", None)
+        if previous is not None:
+            for signal, slot in (
+                (previous.canUndoChanged, self._undoAction.setEnabled),
+                (previous.canRedoChanged, self._redoAction.setEnabled),
+            ):
+                try:
+                    signal.disconnect(slot)
+                except (TypeError, RuntimeError):
+                    pass
+        self._connectedUndoManager = None
         if currentGlyph is None:
             self._undoAction.setEnabled(False)
             self._redoAction.setEnabled(False)
@@ -1169,6 +1183,7 @@ class FontWindow(BaseWindow):
             undoManager.canUndoChanged.connect(self._undoAction.setEnabled)
             self._redoAction.setEnabled(undoManager.canRedo())
             undoManager.canRedoChanged.connect(self._redoAction.setEnabled)
+            self._connectedUndoManager = undoManager
         # and other actions
         for action in self._clipboardActions:
             action.setEnabled(currentGlyph is not None)
