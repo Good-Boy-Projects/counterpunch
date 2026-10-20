@@ -29,6 +29,8 @@ class PenTool(BaseTool):
     icon = _path
     name = QApplication.translate("PenTool", "Pen")
     shortcut = "P"
+    # nib tip, in cursor pixels
+    cursorHotspot = (6, 1)
 
     def __init__(self, parent=None):
         super().__init__(parent)

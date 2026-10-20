@@ -25,6 +25,8 @@ class KnifeTool(BaseTool):
     icon = _path
     name = QApplication.translate("KnifeTool", "Knife")
     shortcut = "E"
+    # blade tip, in cursor pixels
+    cursorHotspot = (5, 1)
 
     def __init__(self, parent=None):
         super().__init__(parent)

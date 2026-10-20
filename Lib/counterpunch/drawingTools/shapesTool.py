@@ -16,6 +16,8 @@ class ShapesTool(BaseTool):
     icon = _path
     name = QApplication.translate("ShapesTool", "Shapes")
     shortcut = "S"
+    # centre of the icon, in cursor pixels
+    cursorHotspot = (15, 9)
 
     def __init__(self, parent=None):
         super().__init__(parent)

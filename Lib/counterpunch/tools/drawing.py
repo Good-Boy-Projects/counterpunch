@@ -14,6 +14,10 @@ from defconQt.tools.drawing import (
     trianglePath,
 )
 
+# point coordinate text
+POINT_TEXT_SIZE = 9  # was 7
+POINT_TEXT_FAMILY = None  # e.g. "Menlo"; None keeps the default font
+
 # ------
 # Colors
 # ------
@@ -579,7 +583,9 @@ def drawGlyphPoints(
 def drawPointText(painter, x, y, scale, ishandle=False):
     color = defaultColor("glyphOtherPoints")
     font = painter.font()
-    font.setPointSize(7)
+    if POINT_TEXT_FAMILY:
+        font.setFamily(POINT_TEXT_FAMILY)
+    font.setPointSize(POINT_TEXT_SIZE)
     if ishandle:
         color = color.lighter(135)
     painter.setPen(color)

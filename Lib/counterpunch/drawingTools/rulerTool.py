@@ -44,6 +44,8 @@ class RulerTool(BaseTool):
     icon = _path
     name = QApplication.translate("RulerTool", "Ruler")
     shortcut = "L"
+    # upper-left end of the ruler, in cursor pixels
+    cursorHotspot = (6, 2)
 
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -1,5 +1,12 @@
 from PySide6.QtCore import QObject, Qt
-from PySide6.QtGui import QColor, QCursor, QPainter, QPainterPath, QPixmap
+from PySide6.QtGui import (
+    QColor,
+    QCursor,
+    QPainter,
+    QPainterPath,
+    QPainterPathStroker,
+    QPixmap,
+)
 from PySide6.QtWidgets import QApplication, QGraphicsDropShadowEffect
 
 from defconQt.tools.drawing import applyEffectToPixmap
@@ -31,10 +38,23 @@ class BaseTool(QObject):
     shortcut = None
     grabKeyboard = False
 
+    # Set to an (x, y) hotspot, in cursor pixels (y down), and the tool's icon
+    # is used as its cursor. Left as None, the tool gets the select arrow.
+    cursorHotspot = None
+
     @property
     def cursor(self):
-        # TODO: cache?
-        return self.makeCursor(_path, path, 9.5, 1)
+        cls = type(self)
+        if self.cursorHotspot is None:
+            return self.makeCursor(_path, path, 9.5, 1)
+        cached = cls.__dict__.get("_cursorCache")
+        if cached is None:
+            stroker = QPainterPathStroker()
+            stroker.setWidth(2.0)
+            halo = stroker.createStroke(self.icon).united(self.icon)
+            cached = self.makeCursor(halo, self.icon, *self.cursorHotspot)
+            cls._cursorCache = cached
+        return cached
 
     def toolActivated(self):
         pass
