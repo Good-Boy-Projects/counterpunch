@@ -578,7 +578,10 @@ def readGlyphSets():
     for i in range(size):
         settings.setArrayIndex(i)
         glyphSetName = settings.value("name", type=str)
-        glyphSetGlyphNames = settings.value("glyphNames", type=str)
+        glyphSetGlyphNames = settings.value("glyphNames", [], type=list)
+        # PySide6 returns '' when a list is read with type=str
+        if isinstance(glyphSetGlyphNames, str):
+            glyphSetGlyphNames = glyphSetGlyphNames.split()
         glyphSets[glyphSetName] = glyphSetGlyphNames
     settings.endArray()
     return glyphSets

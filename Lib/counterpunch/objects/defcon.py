@@ -82,6 +82,15 @@ class TFont(Font):
         font.info.xHeight = 500
         font.info.descender = -250
 
+        # layers: foreground (the default layer), background, reference
+        layers = font.layers
+        layers.defaultLayer.name = "foreground"
+        layers.newLayer("background")
+        layers.newLayer("reference")
+        layers["foreground"].color = "0,1,1,1"  # cyan
+        layers["background"].color = "1,0,1,1"  # magenta
+        layers["reference"].color = "1,1,0,1"  # yellow
+
         defaultGlyphSet = settings.defaultGlyphSet()
         if defaultGlyphSet:
             glyphNames = None
