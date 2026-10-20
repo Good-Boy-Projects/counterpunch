@@ -8,16 +8,19 @@ from PySide6.QtCore import (
     QEvent,
     QIODevice,
     QObject,
+    QPointF,
     QRectF,
     Qt,
     Signal,
 )
 from PySide6.QtGui import (
+    QColor,
     QContextMenuEvent,
     QImage,
     QImageReader,
     QMouseEvent,
     QPainterPath,
+    QPen,
     QPainterPathStroker,
     QTransform,
 )
@@ -29,9 +32,37 @@ from counterpunch.drawingTools.baseTool import BaseTool
 from counterpunch.objects import settings
 from counterpunch.objects.layoutManager import LayoutManager
 from counterpunch.tools import drawing, errorReports
+from counterpunch.tools.cursors import rotateCursor
+from counterpunch.tools.transformTools import (
+    HANDLES,
+    TransformSession,
+    handlePoint,
+    moveMatrix,
+    rotateMatrix,
+    scaleMatrix,
+    selectionBounds,
+    transformHit,
+)
 from counterpunch.tools.uiMethods import UIGlyphGuidelines
 
 GlyphViewMinSizeForGrid = 10000
+# sidebearing handles: size in screen pixels, hit radius in screen pixels
+SidebearingHandleSize = 9
+SidebearingHandleHitRadius = 8
+SidebearingHandleColor = QColor(60, 120, 255, 210)
+# transform box
+TransformBoxColor = QColor(60, 120, 255)
+TransformHandleSize = 8
+_TransformScaleCursors = {
+    "tl": Qt.CursorShape.SizeFDiagCursor,
+    "br": Qt.CursorShape.SizeFDiagCursor,
+    "tr": Qt.CursorShape.SizeBDiagCursor,
+    "bl": Qt.CursorShape.SizeBDiagCursor,
+    "t": Qt.CursorShape.SizeVerCursor,
+    "b": Qt.CursorShape.SizeVerCursor,
+    "l": Qt.CursorShape.SizeHorCursor,
+    "r": Qt.CursorShape.SizeHorCursor,
+}
 
 
 class KeyEventFilter(QObject):
@@ -51,6 +82,8 @@ class GlyphCanvasView(GlyphContextView):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        # needed so hovering (no button held) reaches mouseMoveEvent
+        self.setMouseTracking(True)
         self.setAcceptDrops(True)
         self._currentTool = BaseTool()
         self._currentToolActivated = False
@@ -59,6 +92,10 @@ class GlyphCanvasView(GlyphContextView):
         self._layoutManager = LayoutManager(font, self)
         self._mouseDown = False
         self._preview = False
+        self._sidebearingDrag = None
+        self._transformMode = False
+        self._transformDrag = None
+        self._overlayCursorShape = None
 
         self._defaultDrawingAttributes["showGlyphSelection"] = True
 
@@ -204,6 +241,8 @@ class GlyphCanvasView(GlyphContextView):
         data = dict(widget=self, painter=painter, index=index)
         app.postNotification("glyphViewDrawForeground", data)
         self._currentTool.paint(painter, index)
+        self._drawSidebearingHandles(painter, index)
+        self._drawTransformBox(painter, index)
 
     # drawing primitives
 
@@ -302,6 +341,227 @@ class GlyphCanvasView(GlyphContextView):
             return
         drawing.drawGlyphAnchors(painter, glyph, self._inverseScale)
 
+    # ------------------
+    # Sidebearing handles
+    # ------------------
+
+    def _sidebearingHandlesEnabled(self):
+        return (
+            not self._preview
+            and getattr(self._currentTool, "showSidebearingHandles", False)
+            and self._impliedPointSize > GlyphViewMinSizeForDetails
+        )
+
+    def _sidebearingHandles(self):
+        """
+        Returns (glyph, {"left": QPointF, "right": QPointF}) in canvas
+        coordinates for the active glyph, or None.
+        """
+        glyph = self.activeGlyph()
+        if glyph is None:
+            return None
+        y = -250
+        font = glyph.font
+        if font is not None and font.info.descender:
+            y = font.info.descender
+        return glyph, {
+            "left": QPointF(0, y),
+            "right": QPointF(glyph.width, y),
+        }
+
+    def _sidebearingHandleAt(self, canvasPos):
+        pack = self._sidebearingHandles()
+        if pack is None:
+            return None
+        glyph, handles = pack
+        radius = SidebearingHandleHitRadius * self._inverseScale
+        # right first, so a zero-width glyph can still be widened
+        for side in ("right", "left"):
+            pt = handles[side]
+            if (
+                abs(canvasPos.x() - pt.x()) <= radius
+                and abs(canvasPos.y() - pt.y()) <= radius
+            ):
+                return side
+        return None
+
+    def _overlayCursorFor(self, canvasPos):
+        if self._preview:
+            return None
+        pos = (canvasPos.x(), canvasPos.y())
+        if self._transformMode:
+            bounds = self._transformBounds()
+            hit = (
+                transformHit(bounds, pos, self._inverseScale)
+                if bounds is not None
+                else None
+            )
+            if hit is not None:
+                kind, name = hit
+                if kind == "scale":
+                    return _TransformScaleCursors[name]
+                if kind == "move":
+                    return Qt.CursorShape.SizeAllCursor
+                return "rotate:" + name
+        if self._sidebearingHandlesEnabled():
+            if self._sidebearingHandleAt(canvasPos) is not None:
+                return Qt.CursorShape.SizeHorCursor
+        return None
+
+    def _updateOverlayCursor(self, canvasPos):
+        shape = self._overlayCursorFor(canvasPos)
+        if shape != self._overlayCursorShape:
+            self._overlayCursorShape = shape
+            if isinstance(shape, str):
+                self.setCursor(rotateCursor(shape.split(":")[1]))
+            elif shape is not None:
+                self.setCursor(shape)
+            else:
+                self.setCursor(self._currentTool.cursor)
+
+    def _drawSidebearingHandles(self, painter, index):
+        if not self._sidebearingHandlesEnabled():
+            return
+        if index != self.activeIndex():
+            return
+        pack = self._sidebearingHandles()
+        if pack is None:
+            return
+        _, handles = pack
+        size = SidebearingHandleSize * self._inverseScale
+        half = size / 2
+        painter.save()
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(SidebearingHandleColor)
+        for pt in handles.values():
+            path = QPainterPath()
+            path.addRoundedRect(
+                pt.x() - half, pt.y() - half, size, size, size / 4, size / 4
+            )
+            painter.drawPath(path)
+        painter.restore()
+
+    def _beginSidebearingDrag(self, side, event):
+        glyph = self.activeGlyph()
+        glyph.beginUndoGroup()
+        self._sidebearingDrag = dict(
+            side=side, glyph=glyph, startX=event.localPos().x(), applied=0
+        )
+
+    def _updateSidebearingDrag(self, event):
+        drag = self._sidebearingDrag
+        glyph = drag["glyph"]
+        # measured in widget pixels, so relayout while dragging can't skew it
+        target = round((event.localPos().x() - drag["startX"]) * self._inverseScale)
+        delta = target - drag["applied"]
+        if not delta:
+            return
+        if drag["side"] == "left":
+            # contents follow the mouse, right sidebearing stays put
+            glyph.move((delta, 0))
+        glyph.width += delta
+        drag["applied"] = target
+        self.update()
+
+    def _endSidebearingDrag(self):
+        drag = self._sidebearingDrag
+        self._sidebearingDrag = None
+        drag["glyph"].endUndoGroup()
+        self.update()
+
+    # ------------
+    # Transform box
+    # ------------
+
+    def transformMode(self):
+        return self._transformMode
+
+    def setTransformMode(self, value):
+        value = bool(value)
+        if value == self._transformMode:
+            return
+        if value and (self._preview or self._mouseDown):
+            return
+        self._transformMode = value
+        if not value:
+            self._overlayCursorShape = None
+            self.setCursor(self._currentTool.cursor)
+        self.update()
+
+    def _transformBounds(self):
+        glyph = self.activeGlyph()
+        if glyph is None:
+            return None
+        bounds = selectionBounds(glyph)
+        if bounds is None:
+            return None
+        xMin, yMin, xMax, yMax = bounds
+        if xMax - xMin < 1e-6 and yMax - yMin < 1e-6:
+            return None
+        return bounds
+
+    def _drawTransformBox(self, painter, index):
+        if not self._transformMode or self._preview:
+            return
+        if index != self.activeIndex():
+            return
+        bounds = self._transformBounds()
+        if bounds is None:
+            return
+        xMin, yMin, xMax, yMax = bounds
+        size = TransformHandleSize * self._inverseScale
+        half = size / 2
+        painter.save()
+        pen = QPen(TransformBoxColor)
+        pen.setWidth(0)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(QRectF(xMin, yMin, xMax - xMin, yMax - yMin))
+        painter.setBrush(QColor(255, 255, 255))
+        for name in HANDLES:
+            x, y = handlePoint(bounds, name)
+            painter.drawRect(QRectF(x - half, y - half, size, size))
+        painter.restore()
+
+    def _beginTransformDrag(self, hit, canvasPos):
+        glyph = self.activeGlyph()
+        session = TransformSession(glyph)
+        if not session.valid():
+            return False
+        session.begin()
+        kind, name = hit
+        self._transformDrag = dict(
+            session=session,
+            kind=kind,
+            name=name,
+            start=(canvasPos.x(), canvasPos.y()),
+            bounds=session.bounds,
+        )
+        return True
+
+    def _updateTransformDrag(self, event):
+        drag = self._transformDrag
+        canvasPos = self.mapToCanvas(event.localPos())
+        pos = (canvasPos.x(), canvasPos.y())
+        modifiers = event.modifiers()
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        alt = bool(modifiers & Qt.KeyboardModifier.AltModifier)
+        kind = drag["kind"]
+        if kind == "scale":
+            matrix = scaleMatrix(drag["bounds"], drag["name"], pos, alt, shift)
+        elif kind == "rotate":
+            matrix = rotateMatrix(drag["bounds"], drag["start"], pos, shift)
+        else:
+            matrix = moveMatrix(drag["start"], pos, shift)
+        drag["session"].apply(matrix)
+        self.update()
+
+    def _endTransformDrag(self):
+        drag = self._transformDrag
+        self._transformDrag = None
+        drag["session"].end()
+        self.update()
+
     # ---------------
     # QWidget methods
     # ---------------
@@ -314,6 +574,7 @@ class GlyphCanvasView(GlyphContextView):
         super().hideEvent(event)
         self._setCurrentToolEnabled(False)
         self._preview = False
+        self._transformMode = False
 
     def closeEvent(self, event):
         super().closeEvent(event)
@@ -408,6 +669,11 @@ class GlyphCanvasView(GlyphContextView):
             self.setPreviewEnabled(True)
             event.accept()
             return
+        if self._transformMode and self._transformDrag is None:
+            if event.key() in (Qt.Key.Key_Escape, Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                self.setTransformMode(False)
+                event.accept()
+                return
         # TODO: put this in event filter?
         if self._currentTool.grabKeyboard and event.key() == Qt.Key.Key_Escape:
             ok = self.setCurrentTool(self._previousTool)
@@ -442,6 +708,28 @@ class GlyphCanvasView(GlyphContextView):
             self._panOrigin = event.globalPos()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             return
+        if event.button() == Qt.MouseButton.LeftButton:
+            canvasPos = self.mapToCanvas(event.localPos())
+            if self._transformMode:
+                bounds = self._transformBounds()
+                hit = (
+                    transformHit(
+                        bounds, (canvasPos.x(), canvasPos.y()), self._inverseScale
+                    )
+                    if bounds is not None
+                    else None
+                )
+                if hit is not None and self._beginTransformDrag(hit, canvasPos):
+                    return
+            if self._sidebearingHandlesEnabled():
+                side = self._sidebearingHandleAt(canvasPos)
+                if side is not None:
+                    self._beginSidebearingDrag(side, event)
+                    return
+            if self._transformMode:
+                # clicked away from the box: leave transform mode and let the
+                # current tool handle the click
+                self.setTransformMode(False)
         self._redirectEvent(event, self._currentTool.mousePressEvent, True)
         app = QApplication.instance()
         data = dict(event=event, widget=self)
@@ -453,12 +741,30 @@ class GlyphCanvasView(GlyphContextView):
             self.scrollBy(pos - self._panOrigin)
             self._panOrigin = pos
             return
+        if self._transformDrag is not None:
+            self._updateTransformDrag(event)
+            return
+        if self._sidebearingDrag is not None:
+            self._updateSidebearingDrag(event)
+            return
+        if not event.buttons() & Qt.MouseButton.LeftButton:
+            self._updateOverlayCursor(self.mapToCanvas(event.localPos()))
         self._redirectEvent(event, self._currentTool.mouseMoveEvent, True)
         app = QApplication.instance()
         data = dict(event=event, widget=self)
         app.postNotification("glyphViewMouseMove", data)
 
     def mouseReleaseEvent(self, event):
+        if self._transformDrag is not None:
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._endTransformDrag()
+                self._mouseDown = False
+            return
+        if self._sidebearingDrag is not None:
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._endSidebearingDrag()
+                self._mouseDown = False
+            return
         self._redirectEvent(event, self._currentTool.mouseReleaseEvent, True)
         app = QApplication.instance()
         data = dict(event=event, widget=self)
@@ -504,6 +810,8 @@ class GlyphCanvasView(GlyphContextView):
         if tool.grabKeyboard:
             self._previousTool = self._currentTool
         self._currentTool = tool
+        self.setTransformMode(False)
+        self._overlayCursorShape = None
         self.setCursor(tool.cursor)
         self._setCurrentToolEnabled(True)
         return True

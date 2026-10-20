@@ -1,4 +1,3 @@
-import functools
 import itertools
 
 import booleanOperations
@@ -27,6 +26,13 @@ from counterpunch.objects import icons
 from counterpunch.tools import platformSpecific
 from counterpunch.tools.colorGenerator import ColorGenerator
 from counterpunch.tools.rlabel import RLabel  # TODO: switch to QFormLayout
+from counterpunch.tools.transformTools import (
+    alignSelectedContours,
+    applyTransform,
+    buildTransform,
+    mirrorSelection,
+    snapSelection,
+)
 
 
 def Button(parent=None):
@@ -47,28 +53,6 @@ def _glyphHasSelection(glyph):
             if element.selected:
                 return True
     return False
-
-
-def _partialTransform(glyph, matrix):
-    glyph.beginUndoGroup()
-    for contour in glyph:
-        for point in contour:
-            dirty = False
-            if point.selected:
-                point.x, point.y = matrix.transformPoint((point.x, point.y))
-                dirty = True
-            if dirty:
-                contour.dirty = True
-    for component in glyph.components:
-        if component.selected:
-            component.transform(matrix)
-    for anchor in glyph.anchors:
-        if anchor.selected:
-            anchor.transform(matrix)
-    for guideline in glyph.guidelines:
-        if guideline.selected:
-            guideline.transform(matrix)
-    glyph.endUndoGroup()
 
 
 class SpinBox(QDoubleSpinBox):
@@ -607,6 +591,11 @@ class PropertiesWidget(QWidget):
     def lockScale(self, checked):
         self.scaleYEdit.setEnabled(not checked)
 
+    def _transformOrigin(self, glyph):
+        hasSelection = _glyphHasSelection(glyph)
+        representation = "TruFont.FilterSelection" if hasSelection else None
+        return self.alignmentWidget.origin(representation=representation)
+
     def scale(self):
         glyph = self._glyph
         # TODO: consider disabling the buttons in that case?
@@ -621,15 +610,8 @@ class PropertiesWidget(QWidget):
             sX, sY = -sX, -sY
         sX = 1 + 0.01 * sX
         sY = 1 + 0.01 * sY
-        # apply
-        hasSelection = _glyphHasSelection(glyph)
-        representation = "TruFont.FilterSelection" if hasSelection else None
-        center = self.alignmentWidget.origin(representation=representation)
-        bareFunc = glyph.transform
-        if hasSelection:
-            glyph.transform = functools.partial(_partialTransform, glyph)
-        glyph.scale((sX, sY), center=center)
-        glyph.transform = bareFunc
+        matrix = buildTransform(self._transformOrigin(glyph), scale=(sX, sY))
+        applyTransform(glyph, matrix)
 
     def rotate(self):
         glyph = self._glyph
@@ -638,15 +620,8 @@ class PropertiesWidget(QWidget):
         value = self.rotateEdit.value()
         if self.sender().property("inverted"):
             value = -value
-        # apply
-        hasSelection = _glyphHasSelection(glyph)
-        representation = "TruFont.FilterSelection" if hasSelection else None
-        origin = self.alignmentWidget.origin(representation=representation)
-        bareFunc = glyph.transform
-        if hasSelection:
-            glyph.transform = functools.partial(_partialTransform, glyph)
-        glyph.rotate(value, offset=origin)
-        glyph.transform = bareFunc
+        matrix = buildTransform(self._transformOrigin(glyph), rotate=value)
+        applyTransform(glyph, matrix)
 
     def skew(self):
         glyph = self._glyph
@@ -655,24 +630,14 @@ class PropertiesWidget(QWidget):
         value = self.skewEdit.value()
         if self.sender().property("inverted"):
             value = -value
-        # apply
-        hasSelection = _glyphHasSelection(glyph)
-        representation = "TruFont.FilterSelection" if hasSelection else None
-        origin = self.alignmentWidget.origin(representation=representation)
-        bareFunc = glyph.transform
-        if hasSelection:
-            glyph.transform = functools.partial(_partialTransform, glyph)
-        glyph.skew((value, 0), offset=origin)
-        glyph.transform = bareFunc
+        matrix = buildTransform(self._transformOrigin(glyph), skew=value)
+        applyTransform(glyph, matrix)
 
     def snap(self):
         glyph = self._glyph
         if glyph is None:
             return
-        base = self.snapEdit.value()
-        # apply
-        # TODO: this doesn't go by selection
-        glyph.snap(base)
+        snapSelection(glyph, self.snapEdit.value())
 
     # boolean ops
 
@@ -737,213 +702,35 @@ class PropertiesWidget(QWidget):
 
     # fitting
 
-    def _mirror(self, attr, origin):
-        glyph = self._glyph
-        if not glyph:
-            return
-        points = glyph.selection
-        useSelection = bool(points)
-        vMin = vMax = None
-        for contour in glyph:
-            for point in contour:
-                if useSelection and not point.selected:
-                    continue
-                value = getattr(point, attr)
-                if vMin is None:
-                    vMin = vMax = value
-                else:
-                    vMin = min(vMin, value)
-                    vMax = max(vMax, value)
-                if not useSelection:
-                    points.add(point)
-        factor = getattr(self.alignmentWidget, origin)()
-        base = (2 - factor) * vMin + factor * vMax
-        for point in points:
-            value = base - getattr(point, attr)
-            setattr(point, attr, value)
-        # XXX: hack, relevant contours should be set dirty instead
-        glyph.postNotification("Glyph.ContoursChanged")
-        glyph.dirty = True
-
     def hMirror(self):
-        self._mirror("x", "hOrigin")
+        if self._glyph is not None:
+            mirrorSelection(self._glyph, "x", self.alignmentWidget.hOrigin())
 
     def vMirror(self):
-        self._mirror("y", "vOrigin")
+        if self._glyph is not None:
+            mirrorSelection(self._glyph, "y", self.alignmentWidget.vOrigin())
+
+    def _align(self, axis, mode):
+        if self._glyph is not None:
+            alignSelectedContours(self._glyph, axis, mode)
 
     def alignHLeft(self):
-        glyph = self._glyph
-        if glyph is None:
-            return
-        selectedContours = []
-        xMin_all = None
-        for contour in glyph:
-            sel = False
-            xMin = None
-            for pt in contour:
-                if xMin is None or xMin > pt.x:
-                    xMin = pt.x
-                if pt.selected:
-                    sel = True
-            if sel:
-                selectedContours.append((contour, xMin))
-                if xMin_all is None or xMin_all > xMin:
-                    xMin_all = xMin
-        if not selectedContours:
-            return
-        glyph.holdNotifications()
-        for contour, xMin in selectedContours:
-            if xMin > xMin_all:
-                delta = xMin_all - xMin
-                contour.move((delta, 0))
-        glyph.releaseHeldNotifications()
+        self._align("x", "min")
 
     def alignHCenter(self):
-        glyph = self._glyph
-        if glyph is None:
-            return
-        selectedContours = []
-        xMin_all, xMax_all = None, None
-        for contour in glyph:
-            sel = False
-            xMin, xMax = None, None
-            for pt in contour:
-                if xMin is None or xMin > pt.x:
-                    xMin = pt.x
-                if xMax is None or xMax < pt.x:
-                    xMax = pt.x
-                if pt.selected:
-                    sel = True
-            if sel:
-                selectedContours.append((contour, xMin, xMax))
-                if xMin_all is None or xMin_all > xMin:
-                    xMin_all = xMin
-                if xMax_all is None or xMax_all < xMax:
-                    xMax_all = xMax
-        if not selectedContours:
-            return
-        glyph.holdNotifications()
-        xAvg_all = xMin_all + round(0.5 * (xMax_all - xMin_all))
-        for contour, xMin, xMax in selectedContours:
-            xAvg = xMin + round(0.5 * (xMax - xMin))
-            if xAvg != xAvg_all:
-                delta = xAvg_all - xAvg
-                contour.move((delta, 0))
-        glyph.releaseHeldNotifications()
+        self._align("x", "center")
 
     def alignHRight(self):
-        glyph = self._glyph
-        if glyph is None:
-            return
-        selectedContours = []
-        xMax_all = None
-        for contour in glyph:
-            sel = False
-            xMax = None
-            for pt in contour:
-                if xMax is None or xMax < pt.x:
-                    xMax = pt.x
-                if pt.selected:
-                    sel = True
-            if sel:
-                selectedContours.append((contour, xMax))
-                if xMax_all is None or xMax_all < xMax:
-                    xMax_all = xMax
-        if not selectedContours:
-            return
-        glyph.holdNotifications()
-        for contour, xMax in selectedContours:
-            if xMax < xMax_all:
-                delta = xMax_all - xMax
-                contour.move((delta, 0))
-        glyph.releaseHeldNotifications()
+        self._align("x", "max")
 
     def alignVTop(self):
-        glyph = self._glyph
-        if glyph is None:
-            return
-        selectedContours = []
-        yMax_all = None
-        for contour in glyph:
-            sel = False
-            yMax = None
-            for pt in contour:
-                if yMax is None or yMax < pt.y:
-                    yMax = pt.y
-                if pt.selected:
-                    sel = True
-            if sel:
-                selectedContours.append((contour, yMax))
-                if yMax_all is None or yMax_all < yMax:
-                    yMax_all = yMax
-        if not selectedContours:
-            return
-        glyph.holdNotifications()
-        for contour, yMax in selectedContours:
-            if yMax < yMax_all:
-                delta = yMax_all - yMax
-                contour.move((0, delta))
-        glyph.releaseHeldNotifications()
+        self._align("y", "max")
 
     def alignVCenter(self):
-        glyph = self._glyph
-        if glyph is None:
-            return
-        selectedContours = []
-        yMin_all, yMax_all = None, None
-        for contour in glyph:
-            sel = False
-            yMin, yMax = None, None
-            for pt in contour:
-                if yMin is None or yMin > pt.y:
-                    yMin = pt.y
-                if yMax is None or yMax < pt.y:
-                    yMax = pt.y
-                if pt.selected:
-                    sel = True
-            if sel:
-                selectedContours.append((contour, yMin, yMax))
-                if yMin_all is None or yMin_all > yMin:
-                    yMin_all = yMin
-                if yMax_all is None or yMax_all < yMax:
-                    yMax_all = yMax
-        if not selectedContours:
-            return
-        glyph.holdNotifications()
-        yAvg_all = yMin_all + round(0.5 * (yMax_all - yMin_all))
-        for contour, yMin, yMax in selectedContours:
-            yAvg = yMin + round(0.5 * (yMax - yMin))
-            if yAvg != yAvg_all:
-                delta = yAvg_all - yAvg
-                contour.move((0, delta))
-        glyph.releaseHeldNotifications()
+        self._align("y", "center")
 
     def alignVBottom(self):
-        glyph = self._glyph
-        if glyph is None:
-            return
-        selectedContours = []
-        yMin_all = None
-        for contour in glyph:
-            sel = False
-            yMin = None
-            for pt in contour:
-                if yMin is None or yMin > pt.y:
-                    yMin = pt.y
-                if pt.selected:
-                    sel = True
-            if sel:
-                selectedContours.append((contour, yMin))
-                if yMin_all is None or yMin_all > yMin:
-                    yMin_all = yMin
-        if not selectedContours:
-            return
-        glyph.holdNotifications()
-        for contour, yMin in selectedContours:
-            if yMin > yMin_all:
-                delta = yMin_all - yMin
-                contour.move((0, delta))
-        glyph.releaseHeldNotifications()
+        self._align("y", "min")
 
     # layer operations
 

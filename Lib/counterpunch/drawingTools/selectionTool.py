@@ -70,6 +70,8 @@ class SelectionTool(BaseTool):
     icon = _path
     name = QApplication.translate("SelectionTool", "Select")
     shortcut = "V"
+    # lets the canvas draw and drag the sidebearing handles
+    showSidebearingHandles = True
 
     def __init__(self, parent=None):
         super().__init__(parent)

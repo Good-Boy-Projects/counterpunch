@@ -77,7 +77,7 @@ class Menu(QMenu):
         action.setEnabled(True)
         try:
             action.triggered.disconnect()
-        except TypeError:
+        except (TypeError, RuntimeError):
             pass
         if callback is not None:
             action.triggered.connect(lambda: callback())
@@ -118,6 +118,8 @@ class Entries:
     Edit_Select_All = "&Select All"
     Edit_Deselect = "&Deselect"
     Edit_Find = "&Find…"
+    Edit_Free_Transform = "&Free Transform"
+    Edit_Transform = "&Transform…"
     Edit_Settings = "&Settings…"
 
     View = "&View"
@@ -185,6 +187,8 @@ _shortcuts = {
     Entries.Edit_Select_All: QKeySequence.StandardKey.SelectAll,
     Entries.Edit_Deselect: "Ctrl+D",
     Entries.Edit_Find: QKeySequence.StandardKey.Find,
+    Entries.Edit_Free_Transform: "Ctrl+T",
+    Entries.Edit_Transform: "Ctrl+Shift+T",
     Entries.View_Zoom_In: QKeySequence.StandardKey.ZoomIn,
     Entries.View_Zoom_Out: QKeySequence.StandardKey.ZoomOut,
     Entries.View_Reset_Zoom: "Ctrl+0",
@@ -241,6 +245,8 @@ def globalMenuBar():
     editMenu.fetchAction(Entries.Edit_Select_All)
     # editMenu.fetchAction(Entries.Edit_Deselect)
     editMenu.fetchAction(Entries.Edit_Find)
+    editMenu.fetchAction(Entries.Edit_Free_Transform)
+    editMenu.fetchAction(Entries.Edit_Transform)
     editMenu.addSeparator()
     editMenu.fetchAction(Entries.Edit_Settings)
     menuBar.addMenu(editMenu)

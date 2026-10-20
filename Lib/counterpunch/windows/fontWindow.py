@@ -30,9 +30,11 @@ from counterpunch.controls.propertiesView import PropertiesView
 from counterpunch.controls.statusBar import StatusBar
 from counterpunch.controls.tabWidget import TabWidget
 from counterpunch.controls.toolBar import ToolBar, metricsPlaceholderIcon
+from counterpunch.controls.transformDialog import TransformDialog
 from counterpunch.objects import settings
 from counterpunch.objects.menu import Entries
 from counterpunch.tools import errorReports, platformSpecific
+from counterpunch.tools.transformTools import transformGlyph, transformTargets
 from counterpunch.tools.uiMethods import deleteUISelection, removeUIGlyphElements
 from counterpunch.windows.fontFeaturesWindow import FontFeaturesWindow
 from counterpunch.windows.fontInfoWindow import FontInfoWindow
@@ -275,6 +277,8 @@ class FontWindow(BaseWindow):
         paste = editMenu.fetchAction(Entries.Edit_Paste, self.paste)
         self._clipboardActions = (cut, copy, copyComponent, paste)
         editMenu.fetchAction(Entries.Edit_Select_All, self.selectAll)
+        editMenu.fetchAction(Entries.Edit_Free_Transform, self.freeTransform)
+        editMenu.fetchAction(Entries.Edit_Transform, self.transform)
         # editMenu.fetchAction(Entries.Edit_Deselect, self.deselect)
         self._findAction = editMenu.fetchAction(Entries.Edit_Find, self.findGlyph)
         editMenu.addSeparator()
@@ -505,7 +509,7 @@ class FontWindow(BaseWindow):
         # update and connect setCurrentTool
         try:
             self.toolBar.currentToolChanged.disconnect()
-        except TypeError:
+        except (TypeError, RuntimeError):
             pass
         if not index:
             return
@@ -905,6 +909,23 @@ class FontWindow(BaseWindow):
                     glyph.clear()
                 otherGlyph.drawPoints(glyph.getPointPen())
                 glyph.endUndoGroup()
+
+    def freeTransform(self):
+        if not self.isGlyphTab():
+            return
+        widget = self.stackWidget.currentWidget()
+        widget.setTransformMode(not widget.transformMode())
+
+    def transform(self):
+        if not self.isGlyphTab():
+            return
+        glyph = self.stackWidget.currentWidget().activeGlyph()
+        if glyph is None:
+            return
+        hasSelection = transformTargets(glyph)[4]
+        values = TransformDialog.getTransform(self, hasSelection)
+        if values is not None:
+            transformGlyph(glyph, **values)
 
     def selectAll(self):
         widget = self.stackWidget.currentWidget()
