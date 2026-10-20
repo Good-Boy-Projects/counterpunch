@@ -1,9 +1,10 @@
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
+    QColorDialog,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSizePolicy,
+    QSlider,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -36,6 +38,7 @@ class SettingsWindow(QDialog):
         self.tabWidget = NameTabWidget(self)
         self.tabWidget.addNamedTab(GlyphSetTab(self))
         self.tabWidget.addNamedTab(MetricsWindowTab(self))
+        self.tabWidget.addNamedTab(DrawingTab(self))
         self.tabWidget.addNamedTab(MiscTab(self))
 
         buttonBox = QDialogButtonBox(
@@ -374,3 +377,56 @@ class MiscTab(QWidget):
 
         loadRecentFile = self.loadRecentFileBox.isChecked()
         settings.setLoadRecentFile(loadRecentFile)
+
+
+class DrawingTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.name = self.tr("Drawing")
+
+        self.fillBox = QCheckBox(self.tr("Fill closed contours in the editor"), self)
+        self.colorLabel = QLabel(self.tr("Fill color:"), self)
+        self.colorButton = QPushButton(self)
+        self.colorButton.clicked.connect(self.chooseColor)
+        self.opacityLabel = QLabel(self.tr("Opacity:"), self)
+        self.opacitySlider = QSlider(Qt.Orientation.Horizontal, self)
+        self.opacitySlider.setRange(0, 100)
+        self.opacityValue = QLabel(self)
+        self.opacitySlider.valueChanged.connect(
+            lambda v: self.opacityValue.setText("%d%%" % v)
+        )
+
+        layout = QGridLayout(self)
+        layout.addWidget(self.fillBox, 0, 0, 1, 3)
+        layout.addWidget(self.colorLabel, 1, 0)
+        layout.addWidget(self.colorButton, 1, 1, 1, 2)
+        layout.addWidget(self.opacityLabel, 2, 0)
+        layout.addWidget(self.opacitySlider, 2, 1)
+        layout.addWidget(self.opacityValue, 2, 2)
+        layout.setRowStretch(3, 1)
+        self.setLayout(layout)
+
+        self.readSettings()
+
+    def updateSwatch(self):
+        pixmap = QPixmap(48, 16)
+        pixmap.fill(self._color)
+        self.colorButton.setIcon(QIcon(pixmap))
+        self.colorButton.setText(self._color.name())
+
+    def chooseColor(self):
+        color = QColorDialog.getColor(self._color, self, self.tr("Fill color"))
+        if color.isValid():
+            self._color = color
+            self.updateSwatch()
+
+    def readSettings(self):
+        self.fillBox.setChecked(settings.drawingFillEnabled())
+        self._color = QColor(settings.drawingFillColorName())
+        self.opacitySlider.setValue(settings.drawingFillOpacity())
+        self.updateSwatch()
+
+    def writeSettings(self):
+        settings.setDrawingFillEnabled(self.fillBox.isChecked())
+        settings.setDrawingFillColorName(self._color.name())
+        settings.setDrawingFillOpacity(self.opacitySlider.value())

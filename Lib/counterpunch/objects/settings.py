@@ -223,6 +223,9 @@ _fallbackValues = {
     "fontWindow/glyphCellSize": 86,
     "fontWindow/propertiesHidden": False,
     "metricsWindow/comboBoxItems": _metricsWindowComboBoxItems,
+    "drawing/fillEnabled": True,
+    "drawing/fillColor": "#000000",
+    "drawing/fillOpacity": 20,
     "misc/loadRecentFile": False,
     "outputWindow/wrapLines": False,
     "scriptingWindow/hSplitterSizes": [0, 1],
@@ -322,6 +325,36 @@ def drawingAttributes():
 
 def setDrawingAttributes(drawingAttributes):
     setValue("fontWindow/drawingAttributes", drawingAttributes)
+
+
+def drawingFillEnabled():
+    return value("drawing/fillEnabled")
+
+
+def setDrawingFillEnabled(enabled):
+    setValue("drawing/fillEnabled", enabled)
+
+
+def drawingFillColorName():
+    return value("drawing/fillColor")
+
+
+def setDrawingFillColorName(name):
+    setValue("drawing/fillColor", name)
+
+
+def drawingFillOpacity():
+    return value("drawing/fillOpacity")
+
+
+def setDrawingFillOpacity(percent):
+    setValue("drawing/fillOpacity", percent)
+
+
+def drawingFillColor():
+    color = QColor(drawingFillColorName())
+    color.setAlphaF(drawingFillOpacity() / 100)
+    return color
 
 
 def groupsWindowGeometry():
