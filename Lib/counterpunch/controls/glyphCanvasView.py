@@ -189,22 +189,42 @@ class GlyphCanvasView(GlyphContextView):
         self.update()
 
     def _preferencesChanged(self, notification):
+        self._fillCache = None
         self.readSettings()
+        self.update()
 
     # ---------------
     # Display Control
     # ---------------
 
+    def _fillSettings(self):
+        # cached so we do not construct QSettings on every paint call
+        if getattr(self, "_fillCache", None) is None:
+            self._fillCache = (
+                settings.drawingFillEnabled(),
+                settings.drawingFillColor(),
+            )
+        return self._fillCache
+
     def drawingAttribute(self, attr, flags):
         toolOverride = self._currentTool.drawingAttribute(attr, flags)
         if toolOverride is not None:
             return toolOverride
+        if (
+            attr == "showGlyphFill"
+            and not self._preview
+            and flags.isActiveGlyph
+            and flags.isActiveLayer
+        ):
+            return self._fillSettings()[0]
         return super().drawingAttribute(attr, flags)
 
     def drawingColor(self, attr, flags):
         toolOverride = self._currentTool.drawingColor(attr, flags)
         if toolOverride is not None:
             return toolOverride
+        if attr == "contourFillColor" and not self._preview:
+            return self._fillSettings()[1]
         return super().drawingColor(attr, flags)
 
     # defaults
